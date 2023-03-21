@@ -15,8 +15,8 @@ module.exports = {
 function md5_init() {
   var ctx = {
     'state' : [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476],
-    'count' : 0 // In bytes
-    //'buffer'
+    'count' : 0, // In bytes
+    'buffer' : new Uint8Array(64)
   };
 
   return ctx;
@@ -38,12 +38,41 @@ function get_padding(len_bytes) {
   return ret;
 }
 
-function md5_update(B, ctx) {
-  ctx.count += B.length;
+function md5_transform(state, buf) {
+  console.log(buf);
+  return state;
+}
+
+function md5_update(buf, ctx) {
+  index = ctx.count % 64;
+  ctx.count += buf.length;
+  partLen = 64 - index;
+  let i = 0;
+
+  if (buf.length >= partLen) {
+    buf_part = ctx.buffer.slice(0, index);
+    input_part = buf.slice(0,partLen);
+    md5_transform(ctx.state, [...buf_part, ...input_part]);
+
+    index = 0;
+
+    for (i = partLen; i + 63 < buf.length; i += 64) {
+      md5_transform(ctx.state, buf.slice(i, i + 64));
+    }
+  } else {
+    i = 0;
+  }
+
+  ctx.buffer.set(buf.slice(i), index);
+
   return ctx;
 }
 
 function md5_final(ctx) {
   padding = get_padding(ctx.count);
+  md5_update(padding, ctx);
+  length = [0, 0, 0, 0, 0, 0, 0, 0]; // Dummy for now
+  md5_update(length, ctx);
+  console.log(ctx.count);
   return ctx.state[0];
 }
