@@ -38,6 +38,17 @@ function get_padding(len_bytes) {
   return ret;
 }
 
+function get_length_bytes(len_in_bytes) {
+  return [len_in_bytes & 0xFF,
+    (len_in_bytes >>> 8) & 0xFF,
+    (len_in_bytes >>> 16) & 0xFF,
+    (len_in_bytes >>> 24) & 0xFF,
+    0,//(len_in_bytes >>> 32) & 0xFF,  // Only counting up to 32 bits for now; 64 TBI
+    0,//(len_in_bytes >>> 40) & 0xFF,
+    0,//(len_in_bytes >>> 48) & 0xFF,
+    0];//(len_in_bytes >>> 56) & 0xFF];
+}
+
 function md5_transform(state, buf) {
   console.log(buf);
   return state;
@@ -70,9 +81,8 @@ function md5_update(buf, ctx) {
 
 function md5_final(ctx) {
   padding = get_padding(ctx.count);
+  length = get_length_bytes(ctx.count);
   md5_update(padding, ctx);
-  length = [0, 0, 0, 0, 0, 0, 0, 0]; // Dummy for now
   md5_update(length, ctx);
-  console.log(ctx.count);
   return ctx.state[0];
 }
