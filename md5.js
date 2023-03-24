@@ -55,7 +55,7 @@ function get_length_bits(len_in_bits) {
 }
 
 function rotate_left(value, n) {
-  return (((value & 0xFFFFFFFF) << n) | ((value & 0xFFFFFFFF) >>> (32-n)));
+  return ((value << n) | (value >>> (32-n)));
 }
 
 function md5_transform(ctx, buf) {
