@@ -26,7 +26,7 @@ function get_padding(len_bytes) {
   mod_len_bytes = len_bytes % 64;
   num_bytes = 64;
   if (mod_len_bytes != 56) {
-    num_bytes = (56 - mod_len_bytes) % 64;
+    num_bytes = (64 + 56 - mod_len_bytes) % 64;
   }
 
   ret = new Uint8Array(num_bytes);
@@ -38,20 +38,115 @@ function get_padding(len_bytes) {
   return ret;
 }
 
-function get_length_bytes(len_in_bytes) {
-  return [len_in_bytes & 0xFF,
-    (len_in_bytes >>> 8) & 0xFF,
-    (len_in_bytes >>> 16) & 0xFF,
-    (len_in_bytes >>> 24) & 0xFF,
+function F(x, y, z) {return (((x) & (y)) | ((~x) & (z)));}
+function G(x, y, z) {return (((x) & (z)) | ((y) & (~z)));}
+function H(x, y, z) {return ((x) ^ (y) ^ (z));}
+function I(x, y, z) {return ((y) ^ ((x) | (~z)));}
+
+function get_length_bits(len_in_bits) {
+  return [len_in_bits & 0xFF,
+    (len_in_bits >>> 8) & 0xFF,
+    (len_in_bits >>> 16) & 0xFF,
+    (len_in_bits >>> 24) & 0xFF,
     0,//(len_in_bytes >>> 32) & 0xFF,  // Only counting up to 32 bits for now; 64 TBI
     0,//(len_in_bytes >>> 40) & 0xFF,
     0,//(len_in_bytes >>> 48) & 0xFF,
     0];//(len_in_bytes >>> 56) & 0xFF];
 }
 
-function md5_transform(state, buf) {
-  console.log(buf);
-  return state;
+function rotate_left(value, n) {
+  return (((value & 0xFFFFFFFF) << n) | ((value & 0xFFFFFFFF) >>> (32-n)));
+}
+
+function md5_transform(ctx, buf) {
+  a = ctx.state[0];
+  b = ctx.state[1];
+  c = ctx.state[2];
+  d = ctx.state[3];
+
+  X = new Uint32Array(16);
+  for (let i = j = 0; i < 64; i += 4) {
+    X[j] = buf[i] | (buf[i+1] << 8) | (buf[i+2] << 16) | (buf[i+3] << 24);
+    j += 1;
+  }
+
+  a = (b + (rotate_left((a + F(b,c,d) + X[0 ] + 0xd76aa478), 7 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + F(a,b,c) + X[1 ] + 0xe8c7b756), 12))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + F(d,a,b) + X[2 ] + 0x242070db), 17))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + F(c,d,a) + X[3 ] + 0xc1bdceee), 22))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + F(b,c,d) + X[4 ] + 0xf57c0faf), 7 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + F(a,b,c) + X[5 ] + 0x4787c62a), 12))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + F(d,a,b) + X[6 ] + 0xa8304613), 17))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + F(c,d,a) + X[7 ] + 0xfd469501), 22))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + F(b,c,d) + X[8 ] + 0x698098d8), 7 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + F(a,b,c) + X[9 ] + 0x8b44f7af), 12))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + F(d,a,b) + X[10] + 0xffff5bb1), 17))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + F(c,d,a) + X[11] + 0x895cd7be), 22))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + F(b,c,d) + X[12] + 0x6b901122), 7 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + F(a,b,c) + X[13] + 0xfd987193), 12))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + F(d,a,b) + X[14] + 0xa679438e), 17))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + F(c,d,a) + X[15] + 0x49b40821), 22))) & 0xFFFFFFFF;
+
+  a = (b + (rotate_left((a + G(b,c,d) + X[1 ] + 0xf61e2562), 5 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + G(a,b,c) + X[6 ] + 0xc040b340), 9 ))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + G(d,a,b) + X[11] + 0x265e5a51), 14))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + G(c,d,a) + X[0 ] + 0xe9b6c7aa), 20))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + G(b,c,d) + X[5 ] + 0xd62f105d), 5 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + G(a,b,c) + X[10] +  0x2441453), 9 ))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + G(d,a,b) + X[15] + 0xd8a1e681), 14))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + G(c,d,a) + X[4 ] + 0xe7d3fbc8), 20))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + G(b,c,d) + X[9 ] + 0x21e1cde6), 5 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + G(a,b,c) + X[14] + 0xc33707d6), 9 ))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + G(d,a,b) + X[3 ] + 0xf4d50d87), 14))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + G(c,d,a) + X[8 ] + 0x455a14ed), 20))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + G(b,c,d) + X[13] + 0xa9e3e905), 5 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + G(a,b,c) + X[2 ] + 0xfcefa3f8), 9 ))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + G(d,a,b) + X[7 ] + 0x676f02d9), 14))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + G(c,d,a) + X[12] + 0x8d2a4c8a), 20))) & 0xFFFFFFFF;
+
+  a = (b + (rotate_left((a + H(b,c,d) + X[5 ] + 0xfffa3942), 4 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + H(a,b,c) + X[8 ] + 0x8771f681), 11))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + H(d,a,b) + X[11] + 0x6d9d6122), 16))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + H(c,d,a) + X[14] + 0xfde5380c), 23))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + H(b,c,d) + X[1 ] + 0xa4beea44), 4 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + H(a,b,c) + X[4 ] + 0x4bdecfa9), 11))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + H(d,a,b) + X[7 ] + 0xf6bb4b60), 16))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + H(c,d,a) + X[10] + 0xbebfbc70), 23))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + H(b,c,d) + X[13] + 0x289b7ec6), 4 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + H(a,b,c) + X[0 ] + 0xeaa127fa), 11))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + H(d,a,b) + X[3 ] + 0xd4ef3085), 16))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + H(c,d,a) + X[6 ] +  0x4881d05), 23))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + H(b,c,d) + X[9 ] + 0xd9d4d039), 4 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + H(a,b,c) + X[12] + 0xe6db99e5), 11))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + H(d,a,b) + X[15] + 0x1fa27cf8), 16))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + H(c,d,a) + X[2 ] + 0xc4ac5665), 23))) & 0xFFFFFFFF;
+
+  a = (b + (rotate_left((a + I(b,c,d) + X[0 ] + 0xf4292244), 6 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + I(a,b,c) + X[7 ] + 0x432aff97), 10))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + I(d,a,b) + X[14] + 0xab9423a7), 15))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + I(c,d,a) + X[5 ] + 0xfc93a039), 21))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + I(b,c,d) + X[12] + 0x655b59c3), 6 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + I(a,b,c) + X[3 ] + 0x8f0ccc92), 10))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + I(d,a,b) + X[10] + 0xffeff47d), 15))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + I(c,d,a) + X[1 ] + 0x85845dd1), 21))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + I(b,c,d) + X[8 ] + 0x6fa87e4f), 6 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + I(a,b,c) + X[15] + 0xfe2ce6e0), 10))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + I(d,a,b) + X[6 ] + 0xa3014314), 15))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + I(c,d,a) + X[13] + 0x4e0811a1), 21))) & 0xFFFFFFFF;
+  a = (b + (rotate_left((a + I(b,c,d) + X[4 ] + 0xf7537e82), 6 ))) & 0xFFFFFFFF;
+  d = (a + (rotate_left((d + I(a,b,c) + X[11] + 0xbd3af235), 10))) & 0xFFFFFFFF;
+  c = (d + (rotate_left((c + I(d,a,b) + X[2 ] + 0x2ad7d2bb), 15))) & 0xFFFFFFFF;
+  b = (c + (rotate_left((b + I(c,d,a) + X[9 ] + 0xeb86d391), 21))) & 0xFFFFFFFF;
+
+  ctx.state[0] += a;
+  ctx.state[1] += b;
+  ctx.state[2] += c;
+  ctx.state[3] += d;
+
+  ctx.state[0] = ctx.state[0] & 0xFFFFFFFF;
+  ctx.state[1] = ctx.state[1] & 0xFFFFFFFF;
+  ctx.state[2] = ctx.state[2] & 0xFFFFFFFF;
+  ctx.state[3] = ctx.state[3] & 0xFFFFFFFF;
 }
 
 function md5_update(buf, ctx) {
@@ -63,12 +158,12 @@ function md5_update(buf, ctx) {
   if (buf.length >= partLen) {
     buf_part = ctx.buffer.slice(0, index);
     input_part = buf.slice(0,partLen);
-    md5_transform(ctx.state, [...buf_part, ...input_part]);
+    md5_transform(ctx, [...buf_part, ...input_part]);
 
     index = 0;
 
     for (i = partLen; i + 63 < buf.length; i += 64) {
-      md5_transform(ctx.state, buf.slice(i, i + 64));
+      md5_transform(ctx, buf.slice(i, i + 64));
     }
   } else {
     i = 0;
@@ -81,8 +176,13 @@ function md5_update(buf, ctx) {
 
 function md5_final(ctx) {
   padding = get_padding(ctx.count);
-  length = get_length_bytes(ctx.count);
+  length = get_length_bits(ctx.count*8);
   md5_update(padding, ctx);
   md5_update(length, ctx);
-  return ctx.state[0];
+
+  return new Uint8Array([
+    ctx.state[0] & 0xFF, (ctx.state[0] >> 8) & 0xFF, (ctx.state[0] >> 16) & 0xFF, (ctx.state[0] >> 24) & 0xFF,
+    ctx.state[1] & 0xFF, (ctx.state[1] >> 8) & 0xFF, (ctx.state[1] >> 16) & 0xFF, (ctx.state[1] >> 24) & 0xFF,
+    ctx.state[2] & 0xFF, (ctx.state[2] >> 8) & 0xFF, (ctx.state[2] >> 16) & 0xFF, (ctx.state[2] >> 24) & 0xFF,
+    ctx.state[3] & 0xFF, (ctx.state[3] >> 8) & 0xFF, (ctx.state[3] >> 16) & 0xFF, (ctx.state[3] >> 24) & 0xFF]);
 }
