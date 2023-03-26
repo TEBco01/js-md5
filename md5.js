@@ -163,9 +163,8 @@ function md5_update(buf, ctx) {
   let i = 0;
 
   if (buf.length >= partLen) {
-    buf_part = ctx.buffer.slice(0, index);
-    input_part = buf.slice(0,partLen);
-    md5_transform(ctx, [...buf_part, ...input_part]);
+    ctx.buffer.set(buf.slice(0,partLen), index);
+    md5_transform(ctx, ctx.buffer);
 
     index = 0;
 
