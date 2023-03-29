@@ -9,6 +9,15 @@ module.exports = {
     ctx = md5_init();
     ctx = md5_update(utf8Encode.encode(str), ctx);
     return md5_final(ctx);
+  },
+  init: function () {
+    return md5_init();
+  },
+  update: function (B, context) {
+    return md5_update(B, context);
+  },
+  final: function (context) {
+    return md5_final(context);
   }
 }
 
