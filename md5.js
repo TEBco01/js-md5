@@ -48,10 +48,10 @@ function get_length_bits(len_in_bits) {
     (len_in_bits[0] >>> 8) & 0xFF,
     (len_in_bits[0] >>> 16) & 0xFF,
     (len_in_bits[0] >>> 24) & 0xFF,
-    (len_in_bits[1] >>> 32) & 0xFF,
-    (len_in_bits[1] >>> 40) & 0xFF,
-    (len_in_bits[1] >>> 48) & 0xFF,
-    (len_in_bits[1] >>> 56) & 0xFF];
+    (len_in_bits[1] >>> 0) & 0xFF,
+    (len_in_bits[1] >>> 8) & 0xFF,
+    (len_in_bits[1] >>> 16) & 0xFF,
+    (len_in_bits[1] >>> 24) & 0xFF];
 }
 
 function rotate_left(value, n) {
