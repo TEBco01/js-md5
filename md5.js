@@ -14,7 +14,7 @@ module.exports = {
 
 function md5_init() {
   var ctx = {
-    'state' : [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476],
+    'state' : new Uint32Array([0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476]),
     'count' : new Uint32Array([0,0]),
     'buffer' : new Uint8Array(64)
   };
