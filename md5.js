@@ -22,37 +22,10 @@ function md5_init() {
   return ctx;
 }
 
-function get_padding(len_bits) {
-  mod_len_bytes = (len_bits >>> 3) % 64;
-  num_bytes = 64;
-  if (mod_len_bytes != 56) {
-    num_bytes = (64 + 56 - mod_len_bytes) % 64;
-  }
-
-  ret = new Uint8Array(num_bytes);
-  ret[0] = 0x80;
-  for (let i = 1; i < num_bytes; i++) {
-    ret[i] = 0;
-  }
-
-  return ret;
-}
-
 function F(x, y, z) {return (((x) & (y)) | ((~x) & (z)));}
 function G(x, y, z) {return (((x) & (z)) | ((y) & (~z)));}
 function H(x, y, z) {return ((x) ^ (y) ^ (z));}
 function I(x, y, z) {return ((y) ^ ((x) | (~z)));}
-
-function get_length_bits(len_in_bits) {
-  return [len_in_bits[0] & 0xFF,
-    (len_in_bits[0] >>> 8) & 0xFF,
-    (len_in_bits[0] >>> 16) & 0xFF,
-    (len_in_bits[0] >>> 24) & 0xFF,
-    (len_in_bits[1] >>> 0) & 0xFF,
-    (len_in_bits[1] >>> 8) & 0xFF,
-    (len_in_bits[1] >>> 16) & 0xFF,
-    (len_in_bits[1] >>> 24) & 0xFF];
-}
 
 function rotate_left(value, n) {
   return ((value << n) | (value >>> (32-n)));
@@ -189,6 +162,33 @@ function md5_update(buf, ctx) {
   ctx.buffer.set(buf.slice(i), index);
 
   return ctx;
+}
+
+function get_padding(len_bits) {
+  mod_len_bytes = (len_bits >>> 3) % 64;
+  num_bytes = 64;
+  if (mod_len_bytes != 56) {
+    num_bytes = (64 + 56 - mod_len_bytes) % 64;
+  }
+
+  ret = new Uint8Array(num_bytes);
+  ret[0] = 0x80;
+  for (let i = 1; i < num_bytes; i++) {
+    ret[i] = 0;
+  }
+
+  return ret;
+}
+
+function get_length_bits(len_in_bits) {
+  return [len_in_bits[0] & 0xFF,
+    (len_in_bits[0] >>> 8) & 0xFF,
+    (len_in_bits[0] >>> 16) & 0xFF,
+    (len_in_bits[0] >>> 24) & 0xFF,
+    (len_in_bits[1] >>> 0) & 0xFF,
+    (len_in_bits[1] >>> 8) & 0xFF,
+    (len_in_bits[1] >>> 16) & 0xFF,
+    (len_in_bits[1] >>> 24) & 0xFF];
 }
 
 function md5_final(ctx) {
