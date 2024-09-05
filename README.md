@@ -1,9 +1,9 @@
 # js-md5
 
-A fast, pure javascript implementation of MD5. Faster than most standard pure-JS implementations on my machine.
+A fast, pure javascript implementation of MD5. Faster than most standard pure-JS implementations.
 
 ## Benchmarks
-Results of benchmarks on my machine. This implementation is labelled "md5-js".
+Results of benchmarks on one machine. One is the benchmark included as `benchmark-md5.js`. The other is an independent benchmark (accessible at the link below) with this implementation added. This implementation is labelled "md5-js" in both.
 
 ### Included benchmark:
 
@@ -22,15 +22,17 @@ Results of benchmarks on my machine. This implementation is labelled "md5-js".
 
 https://github.com/Daninet/hash-wasm-benchmark
 
-Note that implementations with -wasm use WebAssembly and are not pure javascript.
+Note that implementations with -wasm use WebAssembly. Despite this, this implementation is faster than one of them, _md5-wasm 2.0.0_.
 
 ## Why it is fast
-### 1. Strategic number conversion
+### 1. Working around javascript's number type
+Due to how javascript works under the hood, many implementations are burdened by unnecessary work spent converting types.
 Javascript has one number type that stores numbers as 64 bit floats, but converts them to 32 bit integers for bitwise operations.
-You can force it to do a conversion by doing a bitwise operation that won't affect the data, such as `& 0xFFFFFFFF` or `| 0`.
-You can get quite a significant speedup if you do this just before assigning to a variable which will be used in multiple bitwise operations.
+In a situation where one number variable's value is used in bitwise operations many times, the conversion will take place each time it is referenced.
+However, you can force it to do the conversion only once by doing a bitwise operation that won't affect the data, such as `& 0xFFFFFFFF` or `| 0`, just before assignment.
+This results in quite a significant speedup.
 
-For example, look at this snippet from the transform function.
+For example, consider the variable `a` in this snippet from MD5's transform function.
 ```
 a = (b + (rotate_left((a + F(b,c,d) + X_0  + 0xd76aa478), 7 ))) | 0;
 d = (a + (rotate_left((d + F(a,b,c) + X_1  + 0xe8c7b756), 12))) | 0;
@@ -40,15 +42,15 @@ a = (b + (rotate_left((a + F(b,c,d) + X_4  + 0xf57c0faf), 7 ))) | 0;
 ```
 Between the assigment to `a` on the first and last line, its value is used five times.
 Without the `| 0` at the end of the line, this would mean five conversions from float representation to integer representation.
-With it, there is only one conversion. This leads to a significant speedup (around 45-70% when it was added orginally).
+With it, there is only one conversion done. This leads to a significant speedup (around 45-70% when it was added here).
 
 Bear in mind there is an overhead for the `| 0` operation. Doing one after every addition is slower, for instance.
 Thus they are best used in cases like this example, where one variable is going to be used in several 
 bitwise operations later and the conversion operation is cheaper than the later conversions together.
 
-### 2. Using many local variables instead of an array
+### 2. Decomposing a frequently used array
 
-One peculiar optimization which I can't fully explain but nonetheless sped up the implementation by 10-15% is using 
+One optimization which empirically sped up the implementation by 10-15% is using 
 16 local variables instead of a typed array of length 16.
 
 Before, `X` was computed as follows and used as `X[i]`.
@@ -64,33 +66,31 @@ After, each `X[i]` became a variable assigned as follows (showing `i = 0` as an 
 ```
 X_0  = buf[0 ] | (buf[1 ] << 8) | (buf[2 ] << 16) | (buf[3 ] << 24);
 ```
-Clearly there is some sort of overhead to using arrays over smallish collections of local variables.
-Presumably there is some number of elements where using an array is faster, but I did not investigate what that limit might be.
 
-### 3. Careful data handling
-Data can only be processed as fast as it is fetched.
-Early iterations of this implementation had several bottlenecks related to passing data to the transform function.
+### 3. Efficient handling of input
+An MD5 implementation has two bottlenecks.
+One is the computation done to transform each block as the hash requires.
+The other is to provide those blocks of data to be transformed.
+Simply ensuring the latter is done in the quickest way possible is a simple but crucial part of a fast implementation.
 
-For an example, take part of the `md5_update` function. This part of the code combines new data with whatever old 
-data there was not long enough to fill a 64 byte block for the transform function.
-Before there was the following, which combines the two by concatenating the relevant slices into a new array.
+For an example, take part of the `md5_update` function. This part of the code combines new data with any previous 
+data that was not long enough to fill a 64 byte block for the transform function.
+Early on, I used the following, which combines the two by concatenating the relevant slices into a new array.
 ```
 buf_part = ctx.buffer.slice(0, index);
 input_part = buf.slice(0,partLen);
 md5_transform(ctx, [...buf_part, ...input_part]);
 ```
-Latter iterations changed this to what follows, which uses the fast `set` method to fill the already existant buffer 
+Later iterations changed this to what follows, which uses the fast `set` method to fill the already existant buffer 
 rather than creating a new one.
 ```
 ctx.buffer.set(buf.slice(0,partLen), index);
 md5_transform(ctx, ctx.buffer);
 ```
+This simple change made the implementation ~25% faster.
 
-
-As another example, there is a sizable overhead to using strings as inputs instead of buffers (because strings are converted to buffers).
+As another example, there is a sizable overhead to using strings as inputs instead of buffers (because strings are then converted to buffers).
 This led to discrepancies when benchmarking.
 Joseph Meyer's implementation (linked in benchmarks file), for instance, is string-native and faster than this implementation on strings,
 but slower than this implementation when it uses buffers (you can try this yourself in the benchmarks).
-
-These sorts of data processing things are common sense, but important. The buffer change made the implementation ~25% faster and 
-using buffers instead of strings makes it ~50% faster.
+Avoiding the conversion by providing input as buffers instead of strings makes the implementation ~50% faster.
